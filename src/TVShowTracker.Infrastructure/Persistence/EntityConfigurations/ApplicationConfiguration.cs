@@ -1,6 +1,6 @@
 ﻿namespace TVShowTracker.Infrastructure.Persistence.Configurations;
 
-public class ShowConfiguration : IEntityTypeConfiguration<TopShow>
+public class ApplicationConfiguration : IEntityTypeConfiguration<TopShow>
 {
     public void Configure(EntityTypeBuilder<TopShow> builder)
     {

@@ -14,8 +14,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\src\TVShowTracker.Application\TVShowTracker.Application.csproj" />
-    <ProjectReference Include="..\src\TVShowTracker.Domain\TVShowTracker.Domain.csproj" />
+    <ProjectReference Include="..\TVShowTracker.Application\TVShowTracker.Application.csproj" />
+    <ProjectReference Include="..\TVShowTracker.Domain\TVShowTracker.Domain.csproj" />
   </ItemGroup>
 
 </Project>

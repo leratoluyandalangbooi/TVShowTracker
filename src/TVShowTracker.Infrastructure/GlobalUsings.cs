@@ -1,6 +1,11 @@
 ﻿global using Microsoft.EntityFrameworkCore;
+global using Microsoft.EntityFrameworkCore.Design;
 global using Microsoft.EntityFrameworkCore.Metadata.Builders;
 global using Microsoft.Extensions.Configuration;
+global using Microsoft.Extensions.DependencyInjection;
 global using System.Text.Json.Serialization;
 global using TVShowTracker.Application.Interfaces;
 global using TVShowTracker.Domain.Entities;
+global using TVShowTracker.Infrastructure.Persistence;
+global using TVShowTracker.Infrastructure.Persistence.Repositories;
+global using TVShowTracker.Infrastructure.Services.Externals;

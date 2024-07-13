@@ -16,7 +16,7 @@ public class ShowRepository : IShowRepository
 
     public async Task<TopShow?> GetTopShowByIdAsync(int id)
     {
-        return await _context.TopShows.FirstOrDefault(x => x.Id = id);
+        return await _context.TopShows.FindAsync(id);
     }
 
     public async Task AddAsync(TopShow show)

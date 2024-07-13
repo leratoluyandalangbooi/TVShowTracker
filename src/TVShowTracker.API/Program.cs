@@ -1,6 +1,6 @@
 using TVShowTracker.Application.Interfaces;
-using TVShowTracker.Application;
-using TVShowTracker.Infrastructure;
+using TVShowTracker.Application.Extensions;
+using TVShowTracker.Infrastructure.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
