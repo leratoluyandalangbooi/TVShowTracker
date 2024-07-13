@@ -5,13 +5,16 @@ VisualStudioVersion = 17.10.34928.147
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{86D11942-435F-4A64-B761-AAAAD4554BCF}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TVShowTracker.API", "src\TVShowTracker.API\TVShowTracker.API.csproj", "{388240B7-0E1F-4EAA-8801-BEDCA9B27C9C}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TVShowTracker.API", "src\TVShowTracker.API\TVShowTracker.API.csproj", "{388240B7-0E1F-4EAA-8801-BEDCA9B27C9C}"
+	ProjectSection(ProjectDependencies) = postProject
+		{331D5FF5-8C48-46A3-AC9D-EBA5BF837EE0} = {331D5FF5-8C48-46A3-AC9D-EBA5BF837EE0}
+	EndProjectSection
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TVShowTracker.Application", "src\TVShowTracker.Application\TVShowTracker.Application.csproj", "{0FA6BE7F-238C-465D-9F94-2DEFF554796D}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TVShowTracker.Application", "src\TVShowTracker.Application\TVShowTracker.Application.csproj", "{0FA6BE7F-238C-465D-9F94-2DEFF554796D}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TVShowTracker.Domain", "src\TVShowTracker.Domain\TVShowTracker.Domain.csproj", "{21721D58-F101-4715-918F-9227F2472F0D}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TVShowTracker.Domain", "src\TVShowTracker.Domain\TVShowTracker.Domain.csproj", "{21721D58-F101-4715-918F-9227F2472F0D}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TVShowTracker.Infrastructure", "TVShowTracker.Infrastructure\TVShowTracker.Infrastructure.csproj", "{331D5FF5-8C48-46A3-AC9D-EBA5BF837EE0}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TVShowTracker.Infrastructure", "TVShowTracker.Infrastructure\TVShowTracker.Infrastructure.csproj", "{331D5FF5-8C48-46A3-AC9D-EBA5BF837EE0}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
