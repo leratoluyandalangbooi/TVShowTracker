@@ -1,9 +1,9 @@
-﻿namespace TVShowTracker.Application.Interfaces;
+﻿namespace TVShowTracker.Application.Abstractions;
 
 public interface IShowRepository
 {
-    Task<List<TopShow>> GetTopShowsFromDatabase();
-    Task<TopShow?> GetTopShowByIdAsync(int id);
-    Task AddAsync(TopShow show);
-    Task SaveAsync();
+    Task<IEnumerable<Show>> GetTopShowsAsync(int pageSize = 20);
+    Task<Show?> GetShowByIdAsync(int id);
+    Task AddOrUpdateAsync(Show show);
+    Task AddRangeAsync(IEnumerable<Show> shows);
 }

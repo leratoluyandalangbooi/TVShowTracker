@@ -1,6 +1,12 @@
-using TVShowTracker.Application.Interfaces;
+using Microsoft.AspNetCore.Authentication.BearerToken;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.EntityFrameworkCore;
+using TVShowTracker.API.Endpoints;
+using TVShowTracker.API.Middleware;
 using TVShowTracker.Application.Extensions;
 using TVShowTracker.Infrastructure.Extensions;
+using TVShowTracker.Infrastructure.Persistence;
+using Yarp.ReverseProxy.Transforms;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -12,25 +18,53 @@ builder.Services.ConfigureApplicationLayer(builder.Configuration);
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-builder.Services.AddMemoryCache();
+builder.Services.AddReverseProxy()
+    .LoadFromConfig(builder.Configuration.GetSection("ReverseProxy"))
+    //.AddTransforms(transforms =>
+    //{
+    //    transforms.AddRequestTransform(transform =>
+    //    {
+    //        transform.RequestHeaders.Remove("Authorization");
+    //        return ValueTask.CompletedTask;
+    //    });
+    //})
+    ;
 
+//builder.Services.AddAuthentication(BearerTokenDefaults.AuthenticationScheme)
+//    .AddBearerToken();
+
+//builder.Services.AddAuthorization(options =>
+//{
+//    options.AddPolicy("AdminPolicy", policy => policy.RequireRole("Admin"));
+//});
 
 
 var app = builder.Build();
+
 
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
+
+    using var scope = app.Services.CreateScope();
+    var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+    dbContext.Database.Migrate();
 }
 
+//app.UseMiddleware<JwtAuthenticationMiddleware>();
+app.UseMiddleware<GlobalExceptionMiddleware>();
 
-app.MapGet("/top", async (ITMDbService tmDbService) =>
-{
-    var results = await tmDbService.GetTopShowsAsync();
-    return Results.Ok(results);
-});
+app.MapShowEndpoints();
+app.MapWatchlistEndpoints();
+app.MapSearchEndpoints();
 
-app.MapGet("/", () => "Hello World!");
+app.UseHttpsRedirection();
+
+//app.UseAuthentication();
+
+//app.UseAuthorization();
+
+//app.MapReverseProxy();
 
 app.Run();

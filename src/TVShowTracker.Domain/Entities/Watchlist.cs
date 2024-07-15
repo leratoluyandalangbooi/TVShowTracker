@@ -1,32 +1,13 @@
 ﻿namespace TVShowTracker.Domain.Entities;
 
-public class Watchlist : Entity
+public class Watchlist : BaseEntity
 {
-    public int UserId { get; private set; }
-    public User User { get; private set; }
-    public int ShowId { get; private set; }
-    public TopShow Show { get; private set; }
-    public bool Watched { get; private set; }
-    public int? LastWatchedEpisodeId { get; private set; }
-    public Episode LastWatchedEpisode { get; private set; }
+    public int UserId { get; set; }
+    public int ShowId { get; set; }
+    public int? EpisodeId { get; set; }
+    public DateTime AddedDate { get; set; }
 
-    public Watchlist(User user, TopShow show)
-    {
-        User = user;
-        UserId = user.Id;
-        Show = show;
-        ShowId = show.Id;
-        Watched = false;
-    }
-
-    public void MarkAsWatched()
-    {
-        Watched = true;
-    }
-
-    public void UpdateLastWatchedEpisode(Episode episode)
-    {
-        LastWatchedEpisode = episode;
-        LastWatchedEpisodeId = episode.Id;
-    }
+    public User? User { get; set; }
+    public Show? Show { get; set; }
+    public Episode? Episode { get; set; }
 }

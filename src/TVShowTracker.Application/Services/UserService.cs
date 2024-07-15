@@ -1,90 +1,159 @@
-﻿using Microsoft.Extensions.Options;
-using Microsoft.IdentityModel.Tokens;
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
-using System.Text;
+﻿using System.Security.Cryptography;
 
 namespace TVShowTracker.Application.Services;
 
-public class UserService
+public class UserService : IUserService
 {
     private readonly IUserRepository _userRepository;
-    private readonly IPasswordHasher<User> _passwordHasher;
-    private readonly JwtSettings _jwtSettings;
-    private readonly IShowRepository _showRepository;
+    private readonly ILogger<UserService> _logger;
 
-    public UserService(IUserRepository userRepository, IPasswordHasher<User> passwordHasher, IOptions<JwtSettings> jwtSettings, IShowRepository showRepository)
+    public UserService(IUserRepository userRepository, ILogger<UserService> logger)
     {
-        _userRepository = userRepository;
-        _passwordHasher = passwordHasher;
-        _jwtSettings = jwtSettings.Value;
-        _showRepository = showRepository;
+        _userRepository = userRepository ?? throw new ArgumentNullException(nameof(userRepository));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    public async Task<bool> RegisterUserAsync(string username, string password, string email)
+    public async Task<User> RegisterUserAsync(string username, string email, string password, string preferredName)
     {
-        var existingUser = await _userRepository.GetByUsernameAsync(username);
-        if (existingUser != null)
+        if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password))
         {
-            return false;
+            throw new ArgumentException("Username, email, and password are required.");
         }
 
-        var user = new User(username, _passwordHasher.HashPassword(null!, password), email);
-        await _userRepository.AddAsync(user);
-        return true;
-    }
-
-    public async Task<string> LoginUserAsync(string username, string password)
-    {
-        var user = await _userRepository.GetByUsernameAsync(username);
-        if (user == null)
+        if (await _userRepository.UsernameExistsAsync(username))
         {
-            return null!;
+            throw new InvalidOperationException("Username already exists.");
         }
 
-        var result = _passwordHasher.VerifyHashedPassword(user, user.Password, password);
-        if (result == PasswordVerificationResult.Failed)
+        if (await _userRepository.EmailExistsAsync(email))
         {
-            return null!;
+            throw new InvalidOperationException("Email already exists.");
         }
 
-        return GenerateJwtToken(user);
-    }
-
-    private string GenerateJwtToken(User user)
-    {
-        var claims = new List<Claim>
+        var user = new User
         {
-            new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
-            new Claim(ClaimTypes.Name, user.Username)
+            Username = username,
+            Email = email,
+            PasswordHash = HashPassword(password),
+            PreferredName = string.IsNullOrWhiteSpace(preferredName) ? username : preferredName,
+            CreatedAt = DateTime.UtcNow
         };
 
-        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtSettings.Secret ?? string.Empty));
-        var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
-        var expires = DateTime.Now.AddDays(_jwtSettings.ExpirationInDays);
+        await _userRepository.CreateAsync(user);
+        _logger.LogInformation($"User registered successfully: {username}");
 
-        var token = new JwtSecurityToken(
-            issuer: _jwtSettings.Issuer,
-            audience: _jwtSettings.Audience,
-            claims: claims,
-            expires: expires,
-            signingCredentials: creds
-        );
-
-        return new JwtSecurityTokenHandler().WriteToken(token);
+        return user;
     }
 
-    public async Task AddToWatchlistAsync(int userId, int showId)
+    public async Task<User> AuthenticateAsync(string username, string password)
     {
-        //var user = await _userRepository.GetByIdAsync(userId);
-        //var show = await _showRepository.GetByIdAsync(showId);
+        var user = await _userRepository.GetByUsernameAsync(username);
 
-        //if (user == null || show == null)
-        //{
-        //    //throw new NotFoundException("User or Show not found.");
-        //}
+        if (user == null || !VerifyPassword(password, user.PasswordHash))
+        {
+            _logger.LogWarning($"Failed login attempt for username: {username}");
+            return null!;
+        }
 
-        //user.AddToWatchlist(show);
-        //await _userRepository.UpdateAsync(user);
+        _logger.LogInformation($"User authenticated successfully: {username}");
+        return user;
+    }
+
+    public async Task<User?> GetUserByIdAsync(int id)
+    {
+        return await _userRepository.GetByIdAsync(id);
+    }
+
+    public async Task<User?> GetUserByUsernameAsync(string username)
+    {
+        return await _userRepository.GetByUsernameAsync(username);
+    }
+
+    public async Task UpdateUserAsync(int id, string email, string preferredName)
+    {
+        var user = await _userRepository.GetByIdAsync(id);
+
+        if (user == null)
+        {
+            throw new KeyNotFoundException("User not found.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(email) && email != user.Email)
+        {
+            if (await _userRepository.EmailExistsAsync(email))
+            {
+                throw new InvalidOperationException("Email already exists.");
+            }
+            user.Email = email;
+        }
+
+        user.UpdatedAt = DateTime.UtcNow;
+        user.PreferredName = preferredName;
+
+        await _userRepository.UpdateAsync(user);
+        _logger.LogInformation($"User updated successfully: {user.Username}");
+    }
+
+    public async Task ChangePasswordAsync(int userId, string currentPassword, string newPassword)
+    {
+        var user = await _userRepository.GetByIdAsync(userId);
+
+        if (user == null)
+        {
+            throw new KeyNotFoundException("User not found.");
+        }
+
+        if (!VerifyPassword(currentPassword, user.PasswordHash))
+        {
+            throw new InvalidOperationException("Current password is incorrect.");
+        }
+
+        user.UpdatedAt = DateTime.UtcNow;
+        user.PasswordHash = HashPassword(newPassword);
+
+        await _userRepository.UpdateAsync(user);
+        _logger.LogInformation($"Password changed successfully for user: {user.Username}");
+    }
+
+    public async Task DeleteUserAsync(int id)
+    {
+        await _userRepository.DeleteAsync(id);
+        _logger.LogInformation($"User deleted successfully: {id}");
+    }
+
+    private string HashPassword(string password)
+    {
+        byte[] salt = new byte[16];
+        using (var rng = RandomNumberGenerator.Create())
+        {
+            rng.GetBytes(salt);
+        }
+
+        using (var pbkdf2 = new Rfc2898DeriveBytes(password, salt, 10000, HashAlgorithmName.SHA256))
+        {
+            byte[] hash = pbkdf2.GetBytes(20);
+            byte[] hashBytes = new byte[36];
+            Array.Copy(salt, 0, hashBytes, 0, 16);
+            Array.Copy(hash, 0, hashBytes, 16, 20);
+            return Convert.ToBase64String(hashBytes);
+        }
+    }
+
+    private bool VerifyPassword(string password, string storedHash)
+    {
+        byte[] hashBytes = Convert.FromBase64String(storedHash);
+        byte[] salt = new byte[16];
+        Array.Copy(hashBytes, 0, salt, 0, 16);
+
+        using (var pbkdf2 = new Rfc2898DeriveBytes(password, salt, 10000, HashAlgorithmName.SHA256))
+        {
+            byte[] hash = pbkdf2.GetBytes(20);
+            for (int i = 0; i < 20; i++)
+            {
+                if (hashBytes[i + 16] != hash[i])
+                    return false;
+            }
+            return true;
+        }
     }
 }

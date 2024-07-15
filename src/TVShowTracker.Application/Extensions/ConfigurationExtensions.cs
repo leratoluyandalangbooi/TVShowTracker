@@ -4,8 +4,8 @@ public static class ConfigurationExtensions
 {
     public static IServiceCollection ConfigureApplicationLayer(this IServiceCollection services, IConfiguration configuration)
     {
-        services.AddTransient<IShowService, ShowService>();
-
+        services.AddScoped<IUserService, UserService>();
+        services.AddScoped<IWatchlistService, WatchlistService>();
         return services;
     }
 }

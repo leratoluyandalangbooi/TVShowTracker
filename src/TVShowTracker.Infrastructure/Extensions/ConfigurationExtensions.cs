@@ -6,12 +6,21 @@ public static class ConfigurationExtensions
     {
         services.AddDbContext<ApplicationDbContext>(options =>
         {
-            options.UseSqlServer(configuration.GetConnectionString(ApplicationDbContextSchema.DefaultConnectionStringName));
+            options.UseSqlServer(configuration.GetConnectionString(ApplicationDbContextSchema.SqlServerConnectionStringName));
+            //options.UseSqlite(configuration.GetConnectionString(ApplicationDbContextSchema.SqlLiteConnectionStringName));
         });
 
-        services.AddHttpClient<ITMDbService, TMDbService>();
-        services.AddTransient<IShowRepository, ShowRepository>();
-        services.AddTransient<IUserRepository, UserRepository>();
+        services.AddHttpClient<ITMDbApiClient, TMDbApiClient>();
+
+        services.AddScoped<ITMDbService, TMDbService>();
+        services.AddScoped<IShowRepository, ShowRepository>();
+        services.AddScoped<IUserRepository, UserRepository>();
+        services.AddScoped<IEpisodeRepository, EpisodeRepository>();
+        services.AddScoped<IWatchlistRepository, WatchlistRepository>();
+
+        services.AddScoped<ISearchService, ElasticSearchService>();
+        services.AddMemoryCache();
+        services.AddDistributedMemoryCache();
 
         return services;
     }
