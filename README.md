@@ -76,3 +76,6 @@ Ensure you have the following settings in your `appsettings.json`:
     "ReadAccessToken": "your_read_access_token"
   }
 }
+
+## Schema
+![database](https://github.com/user-attachments/assets/4767e4ca-196a-49f6-b022-e3b4d86f44b3)
