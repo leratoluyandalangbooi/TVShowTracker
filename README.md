@@ -68,7 +68,14 @@ TVShowTracker API is a service that allows users to track TV shows, seasons, and
 5. Build and run the project
 
 ## Configuration
+```json
+{
+  "ConnectionStrings": {
+    "SqlDbConnection": "Data Source=localhost;initial catalog=tvshowtracker;TrustServerCertificate=True;Trusted_Connection=True;"
+  }
+}
 
+Set Connection String
 Ensure you have the following settings in your `appsettings.json`:
 
 ```json
