@@ -1,12 +1,10 @@
-﻿using Microsoft.AspNetCore.Mvc;
-using Microsoft.IdentityModel.Tokens;
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
-using System.Text;
+﻿using AutoMapper;
+using FluentValidation;
+using Microsoft.AspNetCore.Mvc;
 using TVShowTracker.API.Extensions;
 using TVShowTracker.Application.Abstractions;
-using TVShowTracker.Application.DTOs.User;
-using TVShowTracker.Domain.Entities;
+using TVShowTracker.Application.Abstractions.Services;
+using TVShowTracker.Application.DTOs.Request;
 
 namespace TVShowTracker.API.Endpoints;
 
@@ -21,7 +19,14 @@ public static class UserEndpoints
 
     private static RouteGroupBuilder MapUserEndpoints(this RouteGroupBuilder group)
     {
-        group.MapPost("/register", RegisterUser);
+        group.MapPost("/register", ([FromBody] RegisterUserDto registerDto, 
+            IValidator<RegisterUserDto> validator, IUserService userService, IMapper mapper)
+            => RegisterUser(registerDto, validator, userService, mapper, false));
+
+        group.MapPost("/register-admin", ([FromBody] RegisterUserDto registerDto, 
+            IValidator<RegisterUserDto> validator, IUserService userService, IMapper mapper)
+            => RegisterUser(registerDto, validator, userService, mapper, true)).RequireAuthorization(policy => policy.RequireRole("Admin"));
+
         group.MapPost("/login", LoginUser);
         group.MapGet("/profile", GetUserProfile).RequireAuthorization();
         group.MapPut("/profile", UpdateUserProfile).RequireAuthorization();
@@ -33,17 +38,26 @@ public static class UserEndpoints
 
     private static async Task<IResult> RegisterUser(
         [FromBody] RegisterUserDto registerDto,
-        IUserService userService)
+        IValidator<RegisterUserDto> validator,
+        IUserService userService,
+        IMapper mapper, bool isAdmin, CancellationToken cancellationToken = default)
     {
+        var validationResult = await validator.ValidateAsync(registerDto, cancellationToken);
+        if (!validationResult.IsValid)
+        {
+            return Results.BadRequest(validationResult.Errors);
+        }
+
         try
         {
             var user = await userService.RegisterUserAsync(
                 registerDto.Username,
                 registerDto.Email,
                 registerDto.Password,
-                registerDto.PreferredName);
+                registerDto.PreferredName,
+                isAdmin, cancellationToken);
 
-            return Results.Ok(new { message = "User registered successfully", userId = user.Id });
+            return Results.Ok(new { message = "User registered successfully", userId = user.Username });
         }
         catch (InvalidOperationException ex)
         {
@@ -54,24 +68,22 @@ public static class UserEndpoints
     private static async Task<IResult> LoginUser(
         [FromBody] LoginDto loginDto,
         IUserService userService,
-        IConfiguration configuration)
+        IJwtService jwtService, CancellationToken cancellationToken = default)
     {
-        var user = await userService.AuthenticateAsync(loginDto.Username, loginDto.Password);
+        var user = await userService.AuthenticateAsync(loginDto.Email, loginDto.Password, cancellationToken);
 
         if (user == null)
         {
             return Results.Unauthorized();
         }
 
-        var token = GenerateJwtToken(user, configuration);
-
-        return Results.Ok(new { token });
+        return Results.Ok(user);
     }
 
-    private static async Task<IResult> GetUserProfile(HttpContext context, IUserService userService)
+    private static async Task<IResult> GetUserProfile(HttpContext context, IUserService userService, CancellationToken cancellationToken = default)
     {
         var userId = context.GetUserId();
-        var user = await userService.GetUserByIdAsync(userId);
+        var user = await userService.GetUserByIdAsync(userId, cancellationToken);
 
         if (user == null)
         {
@@ -90,13 +102,13 @@ public static class UserEndpoints
     private static async Task<IResult> UpdateUserProfile(
         [FromBody] UpdateUserProfileDto updateDto,
         HttpContext context,
-        IUserService userService)
+        IUserService userService, CancellationToken cancellationToken = default)
     {
         var userId = context.GetUserId();
 
         try
         {
-            await userService.UpdateUserAsync(userId, updateDto.Email, updateDto.PreferredName);
+            await userService.UpdateUserAsync(userId, updateDto.Email, updateDto.PreferredName, cancellationToken);
             return Results.Ok(new { message = "Profile updated successfully" });
         }
         catch (KeyNotFoundException)
@@ -112,13 +124,13 @@ public static class UserEndpoints
     private static async Task<IResult> ChangePassword(
         [FromBody] ChangePasswordDto changePasswordDto,
         HttpContext context,
-        IUserService userService)
+        IUserService userService, CancellationToken cancellationToken = default)
     {
         var userId = context.GetUserId();
 
         try
         {
-            await userService.ChangePasswordAsync(userId, changePasswordDto.CurrentPassword, changePasswordDto.NewPassword);
+            await userService.ChangePasswordAsync(userId, changePasswordDto.CurrentPassword, changePasswordDto.NewPassword, cancellationToken);
             return Results.Ok(new { message = "Password changed successfully" });
         }
         catch (KeyNotFoundException)
@@ -131,41 +143,18 @@ public static class UserEndpoints
         }
     }
 
-    private static async Task<IResult> DeleteUser(HttpContext context, IUserService userService)
+    private static async Task<IResult> DeleteUser(HttpContext context, IUserService userService, CancellationToken cancellationToken = default)
     {
         var userId = context.GetUserId();
 
         try
         {
-            await userService.DeleteUserAsync(userId);
+            await userService.DeleteUserAsync(userId, cancellationToken);
             return Results.Ok(new { message = "User deleted successfully" });
         }
         catch (KeyNotFoundException)
         {
             return Results.NotFound(new { message = "User not found" });
         }
-    }
-
-    private static string GenerateJwtToken(User user, IConfiguration configuration)
-    {
-        var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(configuration["Jwt:Key"]));
-        var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
-
-        var claims = new[]
-        {
-                new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
-                new Claim(ClaimTypes.Name, user.Username),
-                new Claim(ClaimTypes.Email, user.Email),
-                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
-            };
-
-        var token = new JwtSecurityToken(
-            issuer: configuration["Jwt:Issuer"],
-            audience: configuration["Jwt:Audience"],
-            claims: claims,
-            expires: DateTime.Now.AddHours(3),
-            signingCredentials: credentials);
-
-        return new JwtSecurityTokenHandler().WriteToken(token);
     }
 }

@@ -1,7 +1,4 @@
-﻿using Microsoft.Extensions.Logging;
-using System;
-
-namespace TVShowTracker.Infrastructure.Persistence.Repositories;
+﻿namespace TVShowTracker.Infrastructure.Persistence.Repositories;
 
 internal class UserRepository : IUserRepository
 {
@@ -14,11 +11,11 @@ internal class UserRepository : IUserRepository
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    public async Task<User?> GetByIdAsync(int id)
+    public async Task<User?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
     {
         try
         {
-            return await _context.Users.FindAsync(id);
+            return await _context.Users.FindAsync(id, cancellationToken);
         }
         catch (Exception ex)
         {
@@ -27,11 +24,11 @@ internal class UserRepository : IUserRepository
         }
     }
 
-    public async Task<User?> GetByUsernameAsync(string username)
+    public async Task<User?> GetByUsernameAsync(string username, CancellationToken cancellationToken = default)
     {
         try
         {
-            return await _context.Users.FirstOrDefaultAsync(u => u.Username == username);
+            return await _context.Users.FirstOrDefaultAsync(u => u.Email == username, cancellationToken);
         }
         catch (Exception ex)
         {
@@ -40,11 +37,11 @@ internal class UserRepository : IUserRepository
         }
     }
 
-    public async Task<User?> GetByEmailAsync(string email)
+    public async Task<User?> GetByEmailAsync(string email, CancellationToken cancellationToken = default)
     {
         try
         {
-            return await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
+            return await _context.Users.FirstOrDefaultAsync(u => u.Email == email, cancellationToken);
         }
         catch (Exception ex)
         {
@@ -53,11 +50,11 @@ internal class UserRepository : IUserRepository
         }
     }
 
-    public async Task<IEnumerable<User>> GetAllAsync()
+    public async Task<IEnumerable<User>> GetAllAsync(CancellationToken cancellationToken = default)
     {
         try
         {
-            return await _context.Users.ToListAsync();
+            return await _context.Users.ToListAsync(cancellationToken);
         }
         catch (Exception ex)
         {
@@ -66,7 +63,7 @@ internal class UserRepository : IUserRepository
         }
     }
 
-    public async Task CreateAsync(User user)
+    public async Task CreateAsync(User user, CancellationToken cancellationToken = default)
     {
         if (user == null)
         {
@@ -75,8 +72,8 @@ internal class UserRepository : IUserRepository
 
         try
         {
-            await _context.Users.AddAsync(user);
-            await _context.SaveChangesAsync();
+            await _context.Users.AddAsync(user, cancellationToken);
+            await BeginDatabaseTransactionAsync(cancellationToken);
         }
         catch (Exception ex)
         {
@@ -85,7 +82,7 @@ internal class UserRepository : IUserRepository
         }
     }
 
-    public async Task UpdateAsync(User user)
+    public async Task UpdateAsync(User user, CancellationToken cancellationToken = default)
     {
         if (user == null)
         {
@@ -95,7 +92,7 @@ internal class UserRepository : IUserRepository
         try
         {
             _context.Users.Update(user);
-            await _context.SaveChangesAsync();
+            await BeginDatabaseTransactionAsync(cancellationToken);
         }
         catch (Exception ex)
         {
@@ -104,7 +101,7 @@ internal class UserRepository : IUserRepository
         }
     }
 
-    public async Task DeleteAsync(int id)
+    public async Task DeleteAsync(int id, CancellationToken cancellationToken = default)
     {
         try
         {
@@ -112,7 +109,7 @@ internal class UserRepository : IUserRepository
             if (user != null)
             {
                 _context.Users.Remove(user);
-                await _context.SaveChangesAsync();
+                await BeginDatabaseTransactionAsync(cancellationToken);
             }
         }
         catch (Exception ex)
@@ -122,11 +119,11 @@ internal class UserRepository : IUserRepository
         }
     }
 
-    public async Task<bool> UsernameExistsAsync(string username)
+    public async Task<bool> UsernameExistsAsync(string username, CancellationToken cancellationToken = default)
     {
         try
         {
-            return await _context.Users.AnyAsync(u => u.Username == username);
+            return await _context.Users.AnyAsync(u => u.Username == username, cancellationToken);
         }
         catch (Exception ex)
         {
@@ -135,15 +132,30 @@ internal class UserRepository : IUserRepository
         }
     }
 
-    public async Task<bool> EmailExistsAsync(string email)
+    public async Task<bool> EmailExistsAsync(string email, CancellationToken cancellationToken = default)
     {
         try
         {
-            return await _context.Users.AnyAsync(u => u.Email == email);
+            return await _context.Users.AnyAsync(u => u.Email == email, cancellationToken);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, $"Error occurred while checking if email exists {email}");
+            throw;
+        }
+    }
+
+    private async Task BeginDatabaseTransactionAsync(CancellationToken cancellationToken = default)
+    {
+        using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+        try
+        {
+            await _context.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+        }
+        catch
+        {
+            await transaction.RollbackAsync(cancellationToken);
             throw;
         }
     }

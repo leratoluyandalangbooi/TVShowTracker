@@ -1,0 +1,11 @@
+global using Microsoft.EntityFrameworkCore;
+global using Microsoft.Extensions.Caching.Distributed;
+global using Microsoft.Extensions.Logging;
+global using Moq;
+global using TVShowTracker.Application.Abstractions;
+global using TVShowTracker.Application.Abstractions.Repositories;
+global using TVShowTracker.Application.Abstractions.Services;
+global using TVShowTracker.Domain.Entities;
+global using TVShowTracker.Infrastructure.Persistence;
+global using TVShowTracker.Infrastructure.Persistence.Repositories;
+global using TVShowTracker.Infrastructure.Services;

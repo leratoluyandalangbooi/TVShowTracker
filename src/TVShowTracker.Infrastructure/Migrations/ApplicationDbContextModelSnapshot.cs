@@ -40,16 +40,17 @@ namespace TVShowTracker.Infrastructure.Migrations
                         .HasColumnType("int");
 
                     b.Property<string>("Name")
-                        .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
 
                     b.Property<string>("Overview")
-                        .IsRequired()
-                        .HasMaxLength(1000)
-                        .HasColumnType("nvarchar(1000)");
+                        .HasMaxLength(5000)
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<int>("Runtime")
+                        .HasColumnType("int");
+
+                    b.Property<int>("SeasonId")
                         .HasColumnType("int");
 
                     b.Property<int>("SeasonNumber")
@@ -59,22 +60,71 @@ namespace TVShowTracker.Infrastructure.Migrations
                         .HasColumnType("int");
 
                     b.Property<string>("StillPath")
-                        .IsRequired()
                         .HasMaxLength(2048)
                         .HasColumnType("nvarchar(2048)");
+
+                    b.Property<int>("TMDbEpisodeId")
+                        .HasColumnType("int");
 
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("datetime2");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ShowId", "SeasonNumber", "EpisodeNumber")
-                        .IsUnique();
+                    b.HasIndex("SeasonId");
 
                     b.ToTable("Episodes");
                 });
 
-            modelBuilder.Entity("TVShowTracker.Domain.Entities.Show", b =>
+            modelBuilder.Entity("TVShowTracker.Domain.Entities.Season", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("AirDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("EpisodeCount")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Name")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("Overview")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("PosterPath")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("SeasonNumber")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ShowId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("TMDbSeasonId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ShowId");
+
+                    b.ToTable("Seasons");
+                });
+
+            modelBuilder.Entity("TVShowTracker.Domain.Entities.TVShow", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -95,19 +145,19 @@ namespace TVShowTracker.Infrastructure.Migrations
 
                     b.Property<string>("Overview")
                         .IsRequired()
-                        .HasMaxLength(1000)
-                        .HasColumnType("nvarchar(1000)");
+                        .HasMaxLength(5000)
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<double>("Popularity")
-                        .HasPrecision(3, 1)
-                        .HasColumnType("float(3)");
+                        .HasPrecision(10, 3)
+                        .HasColumnType("float(10)");
 
                     b.Property<string>("PosterPath")
                         .IsRequired()
-                        .HasMaxLength(2048)
-                        .HasColumnType("nvarchar(2048)");
+                        .HasMaxLength(5000)
+                        .HasColumnType("nvarchar(max)");
 
-                    b.Property<int>("ShowId")
+                    b.Property<int>("TMDbShowId")
                         .HasColumnType("int");
 
                     b.Property<DateTime>("UpdatedAt")
@@ -115,12 +165,7 @@ namespace TVShowTracker.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("Name");
-
-                    b.HasIndex("ShowId")
-                        .IsUnique();
-
-                    b.ToTable("Shows");
+                    b.ToTable("TVShows");
                 });
 
             modelBuilder.Entity("TVShowTracker.Domain.Entities.User", b =>
@@ -138,6 +183,11 @@ namespace TVShowTracker.Infrastructure.Migrations
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
+
+                    b.Property<bool>("IsAdmin")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
 
                     b.Property<string>("PasswordHash")
                         .IsRequired()
@@ -168,7 +218,7 @@ namespace TVShowTracker.Infrastructure.Migrations
                     b.ToTable("Users");
                 });
 
-            modelBuilder.Entity("TVShowTracker.Domain.Entities.Watchlist", b =>
+            modelBuilder.Entity("TVShowTracker.Domain.Entities.WatchedEpisode", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -176,19 +226,10 @@ namespace TVShowTracker.Infrastructure.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<DateTime>("AddedDate")
-                        .HasColumnType("datetime2");
-
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int?>("EpisodeId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("ShowId")
-                        .HasColumnType("int");
-
-                    b.Property<int?>("ShowId1")
+                    b.Property<int>("EpisodeId")
                         .HasColumnType("int");
 
                     b.Property<DateTime>("UpdatedAt")
@@ -197,71 +238,77 @@ namespace TVShowTracker.Infrastructure.Migrations
                     b.Property<int>("UserId")
                         .HasColumnType("int");
 
+                    b.Property<DateTime>("WatchedDate")
+                        .HasColumnType("datetime2");
+
                     b.HasKey("Id");
 
                     b.HasIndex("EpisodeId");
 
-                    b.HasIndex("ShowId");
+                    b.HasIndex("UserId");
 
-                    b.HasIndex("ShowId1");
-
-                    b.HasIndex("UserId", "ShowId")
-                        .IsUnique();
-
-                    b.ToTable("Watchlist");
+                    b.ToTable("WatchedEpisodes");
                 });
 
             modelBuilder.Entity("TVShowTracker.Domain.Entities.Episode", b =>
                 {
-                    b.HasOne("TVShowTracker.Domain.Entities.Show", "Show")
+                    b.HasOne("TVShowTracker.Domain.Entities.Season", "Season")
                         .WithMany("Episodes")
+                        .HasForeignKey("SeasonId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Season");
+                });
+
+            modelBuilder.Entity("TVShowTracker.Domain.Entities.Season", b =>
+                {
+                    b.HasOne("TVShowTracker.Domain.Entities.TVShow", "TVShow")
+                        .WithMany("Seasons")
                         .HasForeignKey("ShowId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.Navigation("Show");
+                    b.Navigation("TVShow");
                 });
 
-            modelBuilder.Entity("TVShowTracker.Domain.Entities.Watchlist", b =>
+            modelBuilder.Entity("TVShowTracker.Domain.Entities.WatchedEpisode", b =>
                 {
                     b.HasOne("TVShowTracker.Domain.Entities.Episode", "Episode")
-                        .WithMany()
+                        .WithMany("WatchedEpisodes")
                         .HasForeignKey("EpisodeId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("TVShowTracker.Domain.Entities.Show", "Show")
-                        .WithMany()
-                        .HasForeignKey("ShowId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("TVShowTracker.Domain.Entities.Show", null)
-                        .WithMany("WatchlistItems")
-                        .HasForeignKey("ShowId1");
-
                     b.HasOne("TVShowTracker.Domain.Entities.User", "User")
-                        .WithMany("Watchlist")
+                        .WithMany("WatchedEpisodes")
                         .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.Navigation("Episode");
 
-                    b.Navigation("Show");
-
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("TVShowTracker.Domain.Entities.Show", b =>
+            modelBuilder.Entity("TVShowTracker.Domain.Entities.Episode", b =>
+                {
+                    b.Navigation("WatchedEpisodes");
+                });
+
+            modelBuilder.Entity("TVShowTracker.Domain.Entities.Season", b =>
                 {
                     b.Navigation("Episodes");
+                });
 
-                    b.Navigation("WatchlistItems");
+            modelBuilder.Entity("TVShowTracker.Domain.Entities.TVShow", b =>
+                {
+                    b.Navigation("Seasons");
                 });
 
             modelBuilder.Entity("TVShowTracker.Domain.Entities.User", b =>
                 {
-                    b.Navigation("Watchlist");
+                    b.Navigation("WatchedEpisodes");
                 });
 #pragma warning restore 612, 618
         }

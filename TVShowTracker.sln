@@ -13,6 +13,10 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TVShowTracker.Domain", "src
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TVShowTracker.Infrastructure", "src\TVShowTracker.Infrastructure\TVShowTracker.Infrastructure.csproj", "{F246F184-4799-4280-990D-70FE0BEF9472}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{12F27C06-7B13-4FE9-88B8-44E03994F2B0}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TVShowTracker.UnitTests", "tests\TVShowTracker.UnitTests\TVShowTracker.UnitTests.csproj", "{D06BF33F-90F4-40DB-A5AE-5F3F8E3E1E69}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -35,6 +39,10 @@ Global
 		{F246F184-4799-4280-990D-70FE0BEF9472}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{F246F184-4799-4280-990D-70FE0BEF9472}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{F246F184-4799-4280-990D-70FE0BEF9472}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D06BF33F-90F4-40DB-A5AE-5F3F8E3E1E69}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D06BF33F-90F4-40DB-A5AE-5F3F8E3E1E69}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D06BF33F-90F4-40DB-A5AE-5F3F8E3E1E69}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D06BF33F-90F4-40DB-A5AE-5F3F8E3E1E69}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -44,6 +52,7 @@ Global
 		{0FA6BE7F-238C-465D-9F94-2DEFF554796D} = {86D11942-435F-4A64-B761-AAAAD4554BCF}
 		{21721D58-F101-4715-918F-9227F2472F0D} = {86D11942-435F-4A64-B761-AAAAD4554BCF}
 		{F246F184-4799-4280-990D-70FE0BEF9472} = {86D11942-435F-4A64-B761-AAAAD4554BCF}
+		{D06BF33F-90F4-40DB-A5AE-5F3F8E3E1E69} = {12F27C06-7B13-4FE9-88B8-44E03994F2B0}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {F29A1A5F-4ED0-4156-92C1-8BA7AE402A16}

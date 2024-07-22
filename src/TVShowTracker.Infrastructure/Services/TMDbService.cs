@@ -1,185 +1,225 @@
-﻿namespace TVShowTracker.Infrastructure.Services;
+﻿using AutoMapper;
+using System.Text;
+using TVShowTracker.Application.DTOs.Entities;
 
-public class TMDbService : ITMDbService
+namespace TVShowTracker.Infrastructure.Services
 {
-    private readonly ITMDbApiClient _tmdbApiClient;
-    private readonly IShowRepository _showsRepository;
-    private readonly IEpisodeRepository _episodeRepository;
-    private readonly ISearchService _searchService;
-    private readonly ILogger<TMDbService> _logger;
-    private readonly IDistributedCache _cache;
-
-    public TMDbService(ITMDbApiClient tmdbApiClient, IShowRepository showsRepository, IEpisodeRepository episodeRepository, ISearchService searchService, ILogger<TMDbService> logger, IDistributedCache cache)
+    public class TMDbService : ITMDbService
     {
-        _tmdbApiClient = tmdbApiClient;
-        _showsRepository = showsRepository;
-        _episodeRepository = episodeRepository;
-        _searchService = searchService;
-        _logger = logger;
-        _cache = cache;
-    }
+        private readonly ITMDbApiClient _tmdbApiClient;
+        private readonly ITVShowRepository _showsRepository;
+        private readonly ISeasonRepository _seasonRepository;
+        private readonly IEpisodeRepository _episodeRepository;
+        private readonly ILogger<TMDbService> _logger;
+        private readonly IDistributedCache _cache;
+        private readonly IMapper _mapper;
 
-    public async Task<IEnumerable<Show>?> GetTopShowsAsync(string language = "en-US", int page = 1, int pageSize = 20)
-    {
-        string cacheKey = $"TopShows_{language}_{page}_{pageSize}";
-        var cachedShows = await _cache.GetStringAsync(cacheKey);
-
-        if (!string.IsNullOrEmpty(cachedShows))
+        public TMDbService(
+            ITMDbApiClient tmdbApiClient,
+            ITVShowRepository showsRepository,
+            ISeasonRepository seasonRepository,
+            IEpisodeRepository episodeRepository,
+            ILogger<TMDbService> logger,
+            IDistributedCache cache,
+            IMapper mapper)
         {
-            _logger.LogInformation("Returning top shows from distributed cache");
-            return JsonSerializer.Deserialize<List<Show>>(cachedShows);
+            _tmdbApiClient = tmdbApiClient ?? throw new ArgumentNullException(nameof(tmdbApiClient));
+            _showsRepository = showsRepository ?? throw new ArgumentNullException(nameof(showsRepository));
+            _seasonRepository = seasonRepository ?? throw new ArgumentNullException(nameof(seasonRepository));
+            _episodeRepository = episodeRepository ?? throw new ArgumentNullException(nameof(episodeRepository));
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _cache = cache ?? throw new ArgumentNullException(nameof(cache));
+            _mapper = mapper ?? throw new ArgumentNullException(nameof(mapper));
         }
 
-        try
+        public async Task<IEnumerable<TVShowDto>> GetTopShowsAsync(string language, int page, int pageSize, CancellationToken cancellationToken = default)
         {
-            _logger.LogInformation("Fetching top shows from API");
-            var topShows = await _tmdbApiClient.GetTopShowsAsync(language, page, pageSize);
+            string cacheKey = $"TopShows_{language}_{page}_{pageSize}";
+            byte[] cachedData = await _cache.GetAsync(cacheKey, cancellationToken);
 
-            _logger.LogInformation($"Saving {topShows?.Count()} shows to local database");
-
-            if (topShows == null || !topShows.Any())
+            if (cachedData != null)
             {
-                _logger.LogError("Failed to fetch top shows");
-                throw new Exception("Failed to fetch top shows");
+                _logger.LogInformation("Returning top shows from distributed cache");
+                string cachedJson = Encoding.UTF8.GetString(cachedData);
+                return JsonSerializer.Deserialize<IEnumerable<TVShowDto>>(cachedJson);
             }
 
-            //save to DB
-            await _showsRepository.AddRangeAsync(topShows);
-
-            var cacheEntryOptions = new DistributedCacheEntryOptions().SetAbsoluteExpiration(TimeSpan.FromHours(1));
-            await _cache.SetStringAsync(cacheKey, JsonSerializer.Serialize(topShows), cacheEntryOptions);
-
-            return topShows;
-        }
-        catch (HttpRequestException ex)
-        {
-            _logger.LogError(ex, "Error fetching top shows from TMDb API, falling back to local database");
-            //fallback to DB
-            return await _showsRepository.GetTopShowsAsync(pageSize);
-        }
-    }
-
-    public async Task<Show?> GetShowDetailsAsync(int showId)
-    {
-        string cacheKey = $"ShowDetails_{showId}";
-        var cachedShow = await _cache.GetStringAsync(cacheKey);
-
-        if (!string.IsNullOrEmpty(cachedShow))
-        {
-            _logger.LogInformation($"Returning show details for ID {showId} from distributed cache");
-            return JsonSerializer.Deserialize<Show>(cachedShow);
-        }
-
-        try
-        {
-            _logger.LogInformation($"Fetching show details for ID {showId} from API");
-            var show = await _tmdbApiClient.GetShowDetailsAsync(showId);
-
-            _logger.LogInformation($"Saving show details for ID {showId} to local database");
-
-            if (show == null)
+            try
             {
-                _logger.LogError("Failed to fetch show details");
-                throw new Exception("Failed to fetch show details");
+                _logger.LogInformation("Fetching top shows from API");
+                var topShows = await _tmdbApiClient.GetTopShowsAsync(language, page, pageSize, cancellationToken);
+
+                if (topShows == null || !topShows.Any())
+                {
+                    _logger.LogError("Failed to fetch top shows");
+                    throw new Exception("Failed to fetch top shows");
+                }
+
+                var shows = _mapper.Map<IEnumerable<TVShow>>(topShows);
+                await _showsRepository.AddRangeAsync(shows, cancellationToken);
+
+                var cacheEntryOptions = new DistributedCacheEntryOptions().SetAbsoluteExpiration(TimeSpan.FromHours(1));
+                await _cache.SetStringAsync(cacheKey, JsonSerializer.Serialize(topShows), cacheEntryOptions, cancellationToken);
+
+                return topShows;
+            }
+            catch (HttpRequestException ex)
+            {
+                _logger.LogError(ex, "Error fetching top shows from TMDb API, falling back to local database");
+                var dbShows = await _showsRepository.GetTopShowsAsync(pageSize, cancellationToken);
+                return _mapper.Map<IEnumerable<TVShowDto>>(dbShows);
+            }
+        }
+
+        public async Task<TVShowDto> GetShowDetailsAsync(int showId, CancellationToken cancellationToken = default)
+        {
+            string cacheKey = $"ShowDetails_{showId}";
+            byte[] cachedShow = await _cache.GetAsync(cacheKey, cancellationToken);
+
+            if (cachedShow != null)
+            {
+                _logger.LogInformation($"Returning show details for ID {showId} from distributed cache");
+                string cachedJson = Encoding.UTF8.GetString(cachedShow);
+                return JsonSerializer.Deserialize<TVShowDto>(cachedJson);
             }
 
-            //save to DB
-            await _showsRepository.AddOrUpdateAsync(show);
-
-            var cacheEntryOptions = new DistributedCacheEntryOptions().SetAbsoluteExpiration(TimeSpan.FromHours(24));
-            await _cache.SetStringAsync(cacheKey, JsonSerializer.Serialize(show), cacheEntryOptions);
-
-            return show;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, $"Error fetching TV show details for ID {showId} from API, falling back to local database");
-            //fallback to DB
-            return await _showsRepository.GetShowByIdAsync(showId);
-        }
-    }
-
-    public async Task<Episode?> GetEpisodeDetailsAsync(int showId, int seasonNumber, int episodeNumber)
-    {
-        string cacheKey = $"EpisodeDetails_{showId}_{seasonNumber}_{episodeNumber}";
-        var cachedShow = await _cache.GetStringAsync(cacheKey);
-
-        if (!string.IsNullOrEmpty(cachedShow))
-        {
-            _logger.LogInformation($"Returning episode details for IDs {cacheKey} from distributed cache");
-            return JsonSerializer.Deserialize<Episode>(cachedShow);
-        }
-
-        try
-        {
-            _logger.LogInformation($"Fetching episode details for IDs {cacheKey} from API");
-            var episode = await _tmdbApiClient.GetEpisodeDetailsAsync(showId, seasonNumber, episodeNumber);
-
-            if (episode == null)
+            try
             {
-                _logger.LogError("Failed to fetch episode details");
-                throw new Exception("Failed to fetch episode details");
+                _logger.LogInformation($"Fetching show details for ID {showId} from API");
+                var show = await _tmdbApiClient.GetShowDetailsAsync(showId, cancellationToken);
+
+                if (show == null)
+                {
+                    _logger.LogError("Failed to fetch show details");
+                    throw new Exception("Failed to fetch show details");
+                }
+
+                var showEntity = _mapper.Map<TVShow>(show);
+                await _showsRepository.AddOrUpdateAsync(showEntity, cancellationToken);
+
+                var cacheEntryOptions = new DistributedCacheEntryOptions().SetAbsoluteExpiration(TimeSpan.FromHours(24));
+                await _cache.SetStringAsync(cacheKey, JsonSerializer.Serialize(show), cacheEntryOptions, cancellationToken);
+
+                return show;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error fetching TV show details for ID {showId} from API, falling back to local database");
+                var showData = await _showsRepository.GetShowByIdAsync(showId, cancellationToken);
+                return _mapper.Map<TVShowDto>(showData);
+            }
+        }
+
+        public async Task<SeasonDto> GetShowSeasonDetailsAsync(int showId, int seasonNumber, CancellationToken cancellationToken = default)
+        {
+            string cacheKey = $"ShowSeason_{showId}_{seasonNumber}";
+            byte[] cachedSeasons = await _cache.GetAsync(cacheKey, cancellationToken);
+
+            if (cachedSeasons != null)
+            {
+                _logger.LogInformation($"Returning season details for show ID {showId}, season {seasonNumber} from distributed cache");
+                string cachedJson = Encoding.UTF8.GetString(cachedSeasons);
+                return JsonSerializer.Deserialize<SeasonDto>(cachedJson);
             }
 
-            //save to DB
-            await _episodeRepository.AddOrUpdateAsync(episode);
+            try
+            {
+                _logger.LogInformation($"Fetching season details for show ID {showId}, season {seasonNumber} from API");
+                var season = await _tmdbApiClient.GetShowSeasonDetailsAsync(showId, seasonNumber, cancellationToken);
 
-            var cacheEntryOptions = new DistributedCacheEntryOptions().SetAbsoluteExpiration(TimeSpan.FromHours(24));
-            await _cache.SetStringAsync(cacheKey, JsonSerializer.Serialize(episode), cacheEntryOptions);
+                if (season == null)
+                {
+                    _logger.LogError("Failed to fetch season details");
+                    throw new Exception("Failed to fetch season details");
+                }
 
-            return episode;
+                var seasonEntity = _mapper.Map<Season>(season);
+                await _seasonRepository.AddOrUpdateAsync(seasonEntity, cancellationToken);
+
+                var cacheEntryOptions = new DistributedCacheEntryOptions().SetAbsoluteExpiration(TimeSpan.FromHours(24));
+                await _cache.SetStringAsync(cacheKey, JsonSerializer.Serialize(season), cacheEntryOptions, cancellationToken);
+
+                return season;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error fetching season details for show ID {showId} from API, falling back to local database");
+                var seasonData = await _seasonRepository.GetSeasonsForShowAsync(showId, cancellationToken);
+                return _mapper.Map<SeasonDto>(seasonData);
+            }
         }
-        catch (Exception ex)
+
+        public async Task<EpisodeDto> GetEpisodeDetailsAsync(int showId, int seasonNumber, int episodeNumber, CancellationToken cancellationToken = default)
         {
-            _logger.LogError(ex, $"Error fetching episode details for IDs {cacheKey} from API, falling back to local database");
-            return await _episodeRepository.GetEpisodeAsync(showId, seasonNumber, episodeNumber);
+            string cacheKey = $"EpisodeDetails_{showId}_{seasonNumber}_{episodeNumber}";
+            byte[] cachedEpisode = await _cache.GetAsync(cacheKey, cancellationToken);
+
+            if (cachedEpisode != null)
+            {
+                _logger.LogInformation($"Returning episode details for IDs {cacheKey} from distributed cache");
+                string cachedJson = Encoding.UTF8.GetString(cachedEpisode);
+                return JsonSerializer.Deserialize<EpisodeDto>(cachedJson);
+            }
+
+            try
+            {
+                _logger.LogInformation($"Fetching episode details for IDs {cacheKey} from API");
+                var episode = await _tmdbApiClient.GetEpisodeDetailsAsync(showId, seasonNumber, episodeNumber, cancellationToken);
+
+                if (episode == null)
+                {
+                    _logger.LogError("Failed to fetch episode details");
+                    throw new Exception("Failed to fetch episode details");
+                }
+
+                var episodeEntity = _mapper.Map<Episode>(episode);
+                await _episodeRepository.AddOrUpdateAsync(episodeEntity, cancellationToken);
+
+                var cacheEntryOptions = new DistributedCacheEntryOptions().SetAbsoluteExpiration(TimeSpan.FromHours(24));
+                await _cache.SetStringAsync(cacheKey, JsonSerializer.Serialize(episode), cacheEntryOptions, cancellationToken);
+
+                return episode;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error fetching episode details for IDs {cacheKey} from API, falling back to local database");
+                var episodeData = await _episodeRepository.GetEpisodeAsync(showId, seasonNumber, episodeNumber, cancellationToken);
+                return _mapper.Map<EpisodeDto>(episodeData);
+            }
         }
-    }
 
-    public async Task InvalidateShowCache(int showId)
-    {
-        string cacheKey = $"Show_{showId}";
-        await _cache.RemoveAsync(cacheKey);
-        _logger.LogInformation($"Invalidated cache for show ID {showId}");
-    }
-
-    public async Task<IEnumerable<Show>> SearchShowsAsync(string query)
-    {
-        try
+        public async Task<IEnumerable<TVShowDto>> SearchShowsAsync(string query, CancellationToken cancellationToken = default)
         {
-            _logger.LogInformation($"Searching for shows with query: {query}");
-            var searchResults = await _searchService.SearchShowsAsync(query);
-
-            if (!searchResults.Any())
+            try
             {
                 _logger.LogInformation("No results found in Elastic Search, fetching from TMDb API");
-                var apiResults = await _tmdbApiClient.SearchShowsAsync(query);
+                var apiResults = await _tmdbApiClient.SearchShowsAsync(query, cancellationToken);
 
-                //index API results for future searches
-                await _searchService.IndexShowsAsync(apiResults);
+                if (apiResults == null || !apiResults.Any())
+                {
+                    _logger.LogError("No results found in TMDb API Search, searching from database");
+                    var dbResults = await _showsRepository.SearchShowsAsync(query, cancellationToken);
+                    return _mapper.Map<IEnumerable<TVShowDto>>(dbResults);
+                }
+
                 return apiResults;
             }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error occurred while searching for shows, now searching local database");
+                var dbResults = await _showsRepository.SearchShowsAsync(query, cancellationToken);
+                return _mapper.Map<IEnumerable<TVShowDto>>(dbResults);
+            }
+        }
 
-            return searchResults;
-        }
-        catch (Exception ex)
+        public async Task InvalidateCacheAsync(string cacheKey, CancellationToken cancellationToken = default)
         {
-            _logger.LogError(ex, "Error occurred while searching for shows");
-            throw;
-        }
-    }
-
-    public async Task IndexShowAsync(Show show)
-    {
-        try
-        {
-            await _searchService.IndexShowAsync(show);
-            _logger.LogInformation($"Indexed show: {show.Name}");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, $"Error occurred while indexing show: {show.Name}");
-            throw;
+            if (!string.IsNullOrEmpty(cacheKey))
+            {
+                await _cache.RemoveAsync(cacheKey, cancellationToken);
+                _logger.LogInformation($"Cache for {cacheKey} now removed");
+            }
+            _logger.LogInformation($"Cache for {cacheKey} not found");
         }
     }
 }

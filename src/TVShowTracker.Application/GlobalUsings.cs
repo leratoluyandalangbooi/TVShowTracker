@@ -1,7 +1,6 @@
-﻿global using Microsoft.Extensions.Configuration;
-global using Microsoft.Extensions.DependencyInjection;
-global using Microsoft.Extensions.Logging;
-global using TVShowTracker.Application.Abstractions;
-global using TVShowTracker.Application.Interfaces;
-global using TVShowTracker.Application.Services;
+﻿global using FluentValidation;
+global using TVShowTracker.Application.DTOs.Show;
+global using TVShowTracker.Application.Validators.Show;
+global using TVShowTracker.Application.Validators.User;
 global using TVShowTracker.Domain.Entities;
+

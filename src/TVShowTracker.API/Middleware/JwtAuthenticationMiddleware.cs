@@ -1,19 +1,23 @@
-﻿using Microsoft.IdentityModel.Tokens;
+﻿using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using TVShowTracker.Application.Settings;
 
 namespace TVShowTracker.API.Middleware;
 
 public class JwtAuthenticationMiddleware
 {
     private readonly RequestDelegate _next;
-    private readonly IConfiguration _configuration;
+    private readonly JwtOptions _options;
+    private readonly ILogger<JwtAuthenticationMiddleware> _logger;
 
-    public JwtAuthenticationMiddleware(RequestDelegate next, IConfiguration configuration)
+    public JwtAuthenticationMiddleware(RequestDelegate next, IOptions<JwtOptions> options, ILogger<JwtAuthenticationMiddleware> logger)
     {
         _next = next;
-        _configuration = configuration;
+        _options = options.Value;
+        _logger = logger;
     }
 
     public async Task Invoke(HttpContext context)
@@ -30,16 +34,22 @@ public class JwtAuthenticationMiddleware
     {
         try
         {
+            string key = _options.Key ?? throw new InvalidOperationException("JWT Key is not configured.");
+            string issuer = _options.Issuer ?? throw new InvalidOperationException("JWT Issuer is not configured.");
+            string audience = _options.Audience ?? throw new InvalidOperationException("JWT Audience is not configured.");
+            int expirationHours = _options.ExpirationHours;
+
             var tokenHandler = new JwtSecurityTokenHandler();
-            var key = Encoding.ASCII.GetBytes(_configuration["Jwt:Key"]);
+            var keyToBytes = Encoding.ASCII.GetBytes(key);
+
             tokenHandler.ValidateToken(token, new TokenValidationParameters
             {
                 ValidateIssuerSigningKey = true,
-                IssuerSigningKey = new SymmetricSecurityKey(key),
+                IssuerSigningKey = new SymmetricSecurityKey(keyToBytes),
                 ValidateIssuer = true,
-                ValidIssuer = _configuration["Jwt:Issuer"],
+                ValidIssuer = issuer,
                 ValidateAudience = true,
-                ValidAudience = _configuration["Jwt:Audience"],
+                ValidAudience = audience,
                 ClockSkew = TimeSpan.Zero
             }, out SecurityToken validatedToken);
 
@@ -47,10 +57,9 @@ public class JwtAuthenticationMiddleware
             var identity = new ClaimsIdentity(jwtToken.Claims, "JWT");
             context.User = new ClaimsPrincipal(identity);
         }
-        catch
+        catch (Exception ex)
         {
-            // Do nothing if jwt validation fails
-            // The user won't be attached to context so the request won't have access to secure routes
+            _logger.LogWarning(ex, "JWT validation failed");
         }
     }
 }

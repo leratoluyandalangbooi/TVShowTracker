@@ -1,205 +1,192 @@
-﻿namespace TVShowTracker.Infrastructure.ExternalServices;
+﻿using AutoMapper;
+using Microsoft.Extensions.Options;
+using System.Net.Http.Headers;
+using TVShowTracker.Application.DTOs.Entities;
+using TVShowTracker.Infrastructure.ExternalServices.Models;
+using TVShowTracker.Infrastructure.Settings;
 
-public class TMDbApiClient : ITMDbApiClient
+namespace TVShowTracker.Infrastructure.ExternalServices
 {
-    private readonly HttpClient _httpClient;
-    private readonly string? _apiKey;
-    private readonly string? _baseUrl;
-    private readonly ILogger<TMDbApiClient> _logger;
-    private readonly IMemoryCache _cache;
-
-    public TMDbApiClient(HttpClient httpClient, IConfiguration configuration, ILogger<TMDbApiClient> logger, IMemoryCache cache)
+    public class TMDbApiClient : ITMDbApiClient
     {
-        _httpClient = httpClient;
+        private readonly IHttpClientFactory _httpClientFactory;
+        private readonly TMDbOptions _options;
+        private readonly ILogger<TMDbApiClient> _logger;
+        private readonly IMemoryCache _cache;
+        private readonly IMapper _mapper;
 
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-
-        _apiKey = configuration["TMDb:ApiKey"];
-        _baseUrl = configuration["TMDb:BaseUrl"];
-
-        if (string.IsNullOrEmpty(_apiKey) || string.IsNullOrEmpty(_baseUrl))
+        public TMDbApiClient(
+            IHttpClientFactory httpClientFactory,
+            IOptions<TMDbOptions> options,
+            ILogger<TMDbApiClient> logger,
+            IMemoryCache cache,
+            IMapper mapper)
         {
-            throw new ArgumentException("TMDb API configuration is missing or invalid.");
+            _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
+            _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _cache = cache ?? throw new ArgumentNullException(nameof(cache));
+            _mapper = mapper ?? throw new ArgumentNullException(nameof(mapper));
+
+            // base client auth
+            var client = _httpClientFactory.CreateClient("TMDbApi");
+            client.BaseAddress = new Uri(_options.BaseUrl);
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _options.ReadAccessToken);
+            client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
         }
 
-        _httpClient.BaseAddress = new Uri(_baseUrl);
-        _logger = logger;
-        _cache = cache;
-    }
-
-    public async Task<List<Show>?> GetTopShowsAsync(string language = "en-US", int page = 1, int pageSize = 20)
-    {
-        string cacheKey = $"TopShows_{language}_{page}_{pageSize}";
-        if (_cache.TryGetValue(cacheKey, out List<Show>? cachedShows))
+        public async Task<IEnumerable<TVShowDto>> GetTopShowsAsync(string language, int page, int pageSize, CancellationToken cancellationToken = default)
         {
-            _logger.LogInformation("Returning top shows from cache");
-            return cachedShows;
-        }
+            var cacheKey = $"TopShows_{language}_{page}_{pageSize}";
 
-        try
-        {
-            _logger.LogInformation("Fetching top shows from TMDb API");
-            
-            var response = await _httpClient.GetAsync($"tv/popular?api_key={_apiKey}&language={language}&page={page}");
-            response.EnsureSuccessStatusCode();
-            var content = await response.Content.ReadAsStringAsync();
-            var result = JsonSerializer.Deserialize<TMDbShowResponse>(content);
+            if (_cache.TryGetValue(cacheKey, out IEnumerable<TVShowDto> cachedShows))
+            {
+                _logger.LogInformation("Returning top shows from cache");
+                return cachedShows;
+            }
 
-            var topShows = result?.Results.Select(MapToShow).ToList();
+            var queryParams = new Dictionary<string, string>
+            {
+                ["api_key"] = _options.ApiKey,
+                ["language"] = language,
+                ["page"] = page.ToString(),
+                ["pagesize"] = pageSize.ToString()
+            };
+
+            var shows = await GetAsync<TMDbTopShowsResponse>("tv/popular", queryParams, cancellationToken);
+            var mappedShows = _mapper.Map<IEnumerable<TVShowDto>>(shows.Results);
 
             var cacheEntryOptions = new MemoryCacheEntryOptions().SetAbsoluteExpiration(TimeSpan.FromMinutes(30));
-            _cache.Set(cacheKey, topShows, cacheEntryOptions);
+            _cache.Set(cacheKey, mappedShows, cacheEntryOptions);
 
-            _logger.LogInformation($"Successfully fetched and cached {topShows?.Count} top shows");
-
-            return topShows;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error occurred while fetching top shows");
-            throw;
-        }
-    }
-
-    public async Task<Show?> GetShowDetailsAsync(int showId)
-    {
-        string cacheKey = $"ShowDetails_{showId}";
-        if (_cache.TryGetValue(cacheKey, out Show? cachedShowDetails))
-        {
-            _logger.LogInformation("Returning show details from cache");
-            return cachedShowDetails;
+            return mappedShows;
         }
 
-        try
+        public async Task<TVShowDto> GetShowDetailsAsync(int showId, CancellationToken cancellationToken = default)
         {
-            _logger.LogInformation("Fetching show details from TMDb API");
+            var cacheKey = $"ShowDetails_{showId}";
 
-            var response = await _httpClient.GetAsync($"tv/{showId}?api_key={_apiKey}");
-            response.EnsureSuccessStatusCode();
-            var content = await response.Content.ReadAsStringAsync();
-            var result = JsonSerializer.Deserialize<TMDbShowDetail>(content);
+            if (_cache.TryGetValue(cacheKey, out TVShowDto cachedShowDetails))
+            {
+                _logger.LogInformation("Returning show details from cache");
+                return cachedShowDetails;
+            }
 
-            var showDetails = MapToShowDetail(result);
+            var queryParams = new Dictionary<string, string>();
+            var show = await GetAsync<TMDbShowDetailsResponse>($"tv/{showId}", queryParams, cancellationToken);
 
+            var showDetails = _mapper.Map<TVShowDto>(show);
             var cacheEntryOptions = new MemoryCacheEntryOptions().SetAbsoluteExpiration(TimeSpan.FromMinutes(30));
             _cache.Set(cacheKey, showDetails, cacheEntryOptions);
 
-            _logger.LogInformation($"Successfully fetched and cached show details");
-
             return showDetails;
         }
-        catch (Exception ex)
+
+        public async Task<SeasonDto> GetShowSeasonDetailsAsync(int showId, int seasonNumber, CancellationToken cancellationToken = default)
         {
-            _logger.LogError(ex, "Error occurred while fetching show details");
-            throw;
+            var cacheKey = $"ShowSeasonDetails_{showId}_{seasonNumber}";
+            if (_cache.TryGetValue(cacheKey, out SeasonDto cachedEpisodes))
+            {
+                _logger.LogInformation($"Returning show details from cache for show {showId}, season {seasonNumber}");
+                return cachedEpisodes;
+            }
+
+            var queryParams = new Dictionary<string, string> { ["api_key"] = _options.ApiKey };
+            var seasonResponse = await GetAsync<TMDbSeasonResponse>($"tv/{showId}/season/{seasonNumber}", queryParams, cancellationToken);
+
+            var season = _mapper.Map<SeasonDto>(seasonResponse);
+            
+            var cacheEntryOptions = new MemoryCacheEntryOptions().SetAbsoluteExpiration(TimeSpan.FromMinutes(30));
+            _cache.Set(cacheKey, season, cacheEntryOptions);
+
+            return season;
         }
-        
-    }
 
-    public async Task<Episode?> GetEpisodeDetailsAsync(int showId, int seasonNumber, int episodeNumber)
-    {
-        string cacheKey = $"EpoisodeDetails_{showId}_{seasonNumber}_{episodeNumber}";
-        if (_cache.TryGetValue(cacheKey, out Episode? cachedEpisodeDetails))
+        public async Task<EpisodeDto> GetEpisodeDetailsAsync(int showId, int seasonNumber, int episodeNumber, CancellationToken cancellationToken = default)
         {
-            _logger.LogInformation("Returning episode from cache");
-            return cachedEpisodeDetails;
-        }
+            var cacheKey = $"EpisodeDetails_{showId}_{seasonNumber}_{episodeNumber}";
 
-        try
-        {
-            _logger.LogInformation("Fetching episode details from TMDb API");
+            if (_cache.TryGetValue(cacheKey, out EpisodeDto cachedEpisode))
+            {
+                _logger.LogInformation("Returning episode from cache");
+                return cachedEpisode;
+            }
 
-            var response = await _httpClient.GetAsync($"tv/{showId}/season/{seasonNumber}/episode/{episodeNumber}?api_key={_apiKey}");
-            response.EnsureSuccessStatusCode();
-            var content = await response.Content.ReadAsStringAsync();
-            var result = JsonSerializer.Deserialize<TMDbEpisode>(content);
-
-            // Fetch show details to properly map the episode
-            var showResponse = await _httpClient.GetAsync($"tv/{showId}?api_key={_apiKey}");
-            showResponse.EnsureSuccessStatusCode();
-            var showContent = await showResponse.Content.ReadAsStringAsync();
-            var showResult = JsonSerializer.Deserialize<TMDbShow>(showContent);
-
-            var show = MapToShow(showResult);
-
-            var episodeDetails = MapToEpisode(result, show);
+            var queryParams = new Dictionary<string, string> { ["api_key"] = _options.ApiKey };
+            var episodeResponse = await GetAsync<TMDbEpisodeResponse>($"tv/{showId}/season/{seasonNumber}/episode/{episodeNumber}", queryParams, cancellationToken);
+            var mappedEpisode = _mapper.Map<EpisodeDto>(episodeResponse);
 
             var cacheEntryOptions = new MemoryCacheEntryOptions().SetAbsoluteExpiration(TimeSpan.FromMinutes(30));
-            _cache.Set(cacheKey, episodeDetails, cacheEntryOptions);
+            _cache.Set(cacheKey, mappedEpisode, cacheEntryOptions);
 
-            _logger.LogInformation($"Successfully fetched and cached episode details");
-
-            return episodeDetails;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error occurred while fetching episode details");
-            throw;
+            return mappedEpisode;
         }
 
-    }
-
-    public async Task<List<Show>?> SearchShowsAsync(string query)
-    {
-        try
+        public async Task<IEnumerable<TVShowDto>> SearchShowsAsync(string query, CancellationToken cancellationToken = default)
         {
-            var response = await _httpClient.GetAsync($"search/tv?api_key={_apiKey}&query={Uri.EscapeDataString(query)}");
-            response.EnsureSuccessStatusCode();
-            var content = await response.Content.ReadAsStringAsync();
-            var searchResult = JsonSerializer.Deserialize<TMDbSearchResponse>(content);
+            var queryParams = new Dictionary<string, string>
+            {
+                ["api_key"] = _options.ApiKey,
+                ["query"] = query
+            };
 
-            _logger.LogInformation("Successfully searched for shows with query: {Query}", query);
-
-            return searchResult?.Results.Select(MapToShow).ToList();
+            var searchResponse = await GetAsync<TMDbSearchResponse>("search/tv", queryParams, cancellationToken);
+            return _mapper.Map<IEnumerable<TVShowDto>>(searchResponse.Results);
         }
-        catch (HttpRequestException ex)
+
+        private async Task<T> GetAsync<T>(string endpoint, Dictionary<string, string> queryParams, CancellationToken cancellationToken)
         {
-            _logger.LogError(ex, "HTTP error occurred while searching for shows with query: {Query}", query);
-            throw;
+            var client = _httpClientFactory.CreateClient("TMDbApi");
+            var uriBuilder = new UriBuilder($"{_options.BaseUrl}{endpoint}");
+            var query = System.Web.HttpUtility.ParseQueryString(uriBuilder.Query);
+
+            foreach (var param in queryParams)
+            {
+                query[param.Key] = param.Value;
+            }
+
+            uriBuilder.Query = query.ToString();
+
+            try
+            {
+                _logger.LogInformation($"Sending GET request to: {uriBuilder.Uri}");
+                var response = await client.GetAsync(uriBuilder.Uri, cancellationToken);
+
+                response.EnsureSuccessStatusCode();
+
+                var jsonContent = await response.Content.ReadAsStringAsync(cancellationToken);
+                _logger.LogDebug($"Received response: {jsonContent}");
+
+                var options = new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true,
+                    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+                };
+
+                var result = JsonSerializer.Deserialize<T>(jsonContent, options);
+                if (result == null)
+                {
+                    throw new JsonException("Deserialization resulted in null object");
+                }
+
+                return result;
+            }
+            catch (HttpRequestException ex)
+            {
+                _logger.LogError(ex, $"HTTP error occurred while calling TMDb API. Endpoint: {endpoint}");
+                throw;
+            }
+            catch (JsonException ex)
+            {
+                _logger.LogError(ex, $"Error deserializing TMDb API response. Endpoint: {endpoint}");
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Unexpected error occurred while calling TMDb API. Endpoint: {endpoint}");
+                throw;
+            }
         }
-        catch (JsonException ex)
-        {
-            _logger.LogError(ex, "Error deserializing TMDb API response for search query: {Query}", query);
-            throw;
-        }
-    }
 
-    private Show MapToShow(TMDbShow show)
-    {
-        return new Show
-        {
-            ShowId = show.Id,
-            Name = show.Name,
-            Overview = show.Overview,
-            FirstAirDate = DateTime.Parse(show.FirstAirDate),
-            Popularity = show.Popularity,
-            PosterPath = show.PosterPath,
-            Episodes = new List<Episode>()
-        };
-    }
-
-    private Show MapToShowDetail(TMDbShowDetail show)
-    {
-        var mappedShow = MapToShow(show);
-
-        mappedShow.Episodes = show.Seasons
-            .SelectMany(s => s.Episodes.Select(e => MapToEpisode(e, mappedShow)))
-            .ToList();
-
-        return mappedShow;
-    }
-
-    private Episode MapToEpisode(TMDbEpisode episode, Show show)
-    {
-        return new Episode
-        {
-            Id = episode.Id,
-            ShowId = episode.ShowId,
-            SeasonNumber = episode.SeasonNumber,
-            EpisodeNumber = episode.EpisodeNumber,
-            Name = episode.Name,
-            AirDate = DateTime.Parse(episode.AirDate),
-            Show = show
-        };
     }
 }

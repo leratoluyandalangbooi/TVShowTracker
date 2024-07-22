@@ -1,1 +1,1 @@
-﻿global using TVShowTracker.Domain.Common;
+﻿

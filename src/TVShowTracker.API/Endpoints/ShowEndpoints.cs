@@ -1,7 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using TVShowTracker.API.Extensions;
-using TVShowTracker.Application.Abstractions;
-using TVShowTracker.Application.Interfaces;
+using TVShowTracker.Application.Abstractions.Repositories;
+using TVShowTracker.Application.Abstractions.Services;
 using TVShowTracker.Domain.Entities;
 
 namespace TVShowTracker.API.Endpoints;
@@ -11,29 +11,31 @@ public static class ShowEndpoints
     public static void MapShowEndpoints(this WebApplication app)
     {
         app.MapGroup("/api/shows")
-            .WithTags("Shows")
+            .WithTags("TV Shows")
             .MapShowEndpoints();
     }
 
     private static RouteGroupBuilder MapShowEndpoints(this RouteGroupBuilder group)
     {
-        group.MapGet("/top", GetTopShows);
-        group.MapGet("/{id}", GetShowDetails);
-        group.MapGet("/{showId}/season/{seasonNumber}/episode/{episodeNumber}", GetEpisodeDetails);
-        group.MapGet("/search", SearchShows);
-        group.MapPost("/", AddShow).RequireAuthorization("AdminPolicy");
-        group.MapPut("/{id}", UpdateShow).RequireAuthorization("AdminPolicy");
+        group.MapGet("/top", GetTopShows).WithSummary("Top Shows");
+        group.MapGet("/{id}", GetShowDetails).WithSummary("Show Details");
+        group.MapGet("/{showId}/season/{seasonNumber}", GetSeasonDetails).WithSummary("Season Details");
+        group.MapGet("/{showId}/season/{seasonNumber}/episode/{episodeNumber}", GetEpisodeDetails).WithSummary("Episode Details");
+        group.MapGet("/search", SearchShows).WithSummary("Search Shows");
+        group.MapDelete("/cache", InvalidateCache).RequireAuthorization(policy => policy.RequireRole("Admin")).WithSummary("Clear Cache");
+        group.MapPost("/", AddShow).RequireAuthorization(policy => policy.RequireRole("Admin")).WithSummary("Add Show (Optional)");
+        group.MapPut("/{id}", UpdateShow).RequireAuthorization(policy => policy.RequireRole("Admin")).WithSummary("Update Show (Optional)");
 
         return group;
     }
 
-    private static async Task<IResult> GetTopShows([FromQuery] string language,
-        [FromQuery] int page, [FromQuery] int pageSize,
-        ITMDbService tmdbService)
+    private static async Task<IResult> GetTopShows(ITMDbService tmdbService, [FromQuery] string? language = null,
+        [FromQuery] int? page = null,
+        [FromQuery] int? pageSize = null)
     {
         try
         {
-            var shows = await tmdbService.GetTopShowsAsync(language, page, pageSize);
+            var shows = await tmdbService.GetTopShowsAsync(language!, page ?? 1, pageSize ?? 20);
             return Results.Ok(shows);
         }
         catch (Exception ex)
@@ -61,6 +63,26 @@ public static class ShowEndpoints
         }
     }
 
+    private static async Task<IResult> GetSeasonDetails(
+            int showId,
+            int seasonNumber,
+            ITMDbService tmdbService)
+    {
+        try
+        {
+            var episode = await tmdbService.GetShowSeasonDetailsAsync(showId, seasonNumber);
+            if (episode == null)
+            {
+                return Results.NotFound($"Season {seasonNumber} for show id {showId} not found.");
+            }
+            return Results.Ok(episode);
+        }
+        catch (Exception ex)
+        {
+            return Results.Problem($"An error occurred while fetching season details: {ex.Message}");
+        }
+    }
+
     private static async Task<IResult> GetEpisodeDetails(
             int showId,
             int seasonNumber,
@@ -72,7 +94,7 @@ public static class ShowEndpoints
             var episode = await tmdbService.GetEpisodeDetailsAsync(showId, seasonNumber, episodeNumber);
             if (episode == null)
             {
-                return Results.NotFound($"Episode not found for Show ID {showId}, Season {seasonNumber}, Episode {episodeNumber}.");
+                return Results.NotFound($"Episode {episodeNumber} season {seasonNumber} for show id {showId} not found.");
             }
             return Results.Ok(episode);
         }
@@ -96,10 +118,9 @@ public static class ShowEndpoints
             return Results.Problem($"An error occurred while searching for shows: {ex.Message}");
         }
     }
-    
-    //these two are now optional, as TMDb API is the primary data source
-    //move it to admin setups
-    private static async Task<IResult> AddShow([FromBody] Show show, HttpContext context, IShowRepository showRepository)
+
+    // These two are optional, TMDb API is the primary data source 
+    private static async Task<IResult> AddShow([FromBody] TVShow show, HttpContext context, ITVShowRepository showRepository)
     {
         if (!context.IsInRole("Admin"))
         {
@@ -108,6 +129,13 @@ public static class ShowEndpoints
 
         try
         {
+            var showData = await showRepository.GetTopShowsAsync();
+
+            if (showData == null || !showData.Any())
+            {
+                return Results.Problem("Cannot add shows manually as show data service is currently available");
+            }
+
             await showRepository.AddOrUpdateAsync(show);
             return Results.Created($"/api/shows/{show.Id}", show);
         }
@@ -117,7 +145,7 @@ public static class ShowEndpoints
         }
     }
 
-    private static async Task<IResult> UpdateShow( int id, [FromBody] Show updatedShow, HttpContext context, IShowRepository showRepository)
+    private static async Task<IResult> UpdateShow(int id, [FromBody] TVShow updatedShow, HttpContext context, ITVShowRepository showRepository)
     {
         if (!context.IsInRole("Admin"))
         {
@@ -126,6 +154,12 @@ public static class ShowEndpoints
 
         try
         {
+            var showData = await showRepository.GetTopShowsAsync();
+            if (showData == null || !showData.Any())
+            {
+                return Results.Problem("Cannot add shows manually as show data service is currently available");
+            }
+
             var existingShow = await showRepository.GetShowByIdAsync(id);
             if (existingShow == null)
             {
@@ -137,6 +171,7 @@ public static class ShowEndpoints
             existingShow.FirstAirDate = updatedShow.FirstAirDate;
             existingShow.Popularity = updatedShow.Popularity;
             existingShow.PosterPath = updatedShow.PosterPath;
+            existingShow.CreatedAt = updatedShow.CreatedAt;
 
             await showRepository.AddOrUpdateAsync(existingShow);
 
@@ -145,6 +180,26 @@ public static class ShowEndpoints
         catch (Exception ex)
         {
             return Results.Problem($"An error occurred while updating the show: {ex.Message}");
+        }
+    }
+
+    private static async Task<IResult> InvalidateCache(string cachKey, ITMDbService tmdbService, HttpContext context)
+    {
+        if (!context.IsInRole("Admin"))
+        {
+            return Results.Forbid();
+        }
+
+        try
+        {
+            await tmdbService.InvalidateCacheAsync(cachKey);
+
+            return Results.Created();
+        }
+        catch (Exception ex)
+        {
+            return Results.Problem($"An error occurred while invalidating cache: {ex.Message}");
+
         }
     }
 }
