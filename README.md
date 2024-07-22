@@ -56,6 +56,9 @@ TVShowTracker API is a service that allows users to track TV shows, seasons, and
 - Caching is implemented to improve performance
 - JWT authentication is used for user authorization
 
+## Schema
+![database](https://github.com/user-attachments/assets/79989060-6b3c-4caf-a517-489d79f99391)
+
 ## Getting Started
 
 1. Clone the repository
@@ -76,6 +79,3 @@ Ensure you have the following settings in your `appsettings.json`:
     "ReadAccessToken": "your_read_access_token"
   }
 }
-
-## Schema
-![database](https://github.com/user-attachments/assets/4767e4ca-196a-49f6-b022-e3b4d86f44b3)
