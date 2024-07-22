@@ -48,7 +48,7 @@ TVShowTracker API is a service that allows users to track TV shows, seasons, and
 - Users
 - WatchedEpisodes
 
-## Technical Details
+# Technical Details
 
 - The API is built using ASP.NET Core
 - It uses AutoMapper for object mapping
@@ -59,6 +59,8 @@ TVShowTracker API is a service that allows users to track TV shows, seasons, and
 ## Schema
 ![database](https://github.com/user-attachments/assets/79989060-6b3c-4caf-a517-489d79f99391)
 
+![image](https://github.com/user-attachments/assets/ad463846-6105-42f0-85cd-a96b0d7a8de9)
+
 ## Getting Started
 
 1. Clone the repository
@@ -68,14 +70,15 @@ TVShowTracker API is a service that allows users to track TV shows, seasons, and
 5. Build and run the project
 
 ## Configuration
+Set Connection String `appsettings.json`
 ```json
 {
   "ConnectionStrings": {
     "SqlDbConnection": "Data Source=localhost;initial catalog=tvshowtracker;TrustServerCertificate=True;Trusted_Connection=True;"
   }
 }
+```
 
-Set Connection String
 Ensure you have the following settings in your `appsettings.json`:
 
 ```json
