@@ -17,6 +17,26 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{12F27C06
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TVShowTracker.UnitTests", "tests\TVShowTracker.UnitTests\TVShowTracker.UnitTests.csproj", "{D06BF33F-90F4-40DB-A5AE-5F3F8E3E1E69}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "backend", "backend", "{1697C1EA-ADAE-4703-9C2B-896C3C0C236F}"
+	ProjectSection(SolutionItems) = preProject
+		backend\readme.md = backend\readme.md
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "frontend", "frontend", "{6A57B148-C459-4105-B76A-05EB0A22823F}"
+	ProjectSection(SolutionItems) = preProject
+		frontend\readme.md = frontend\readme.md
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{E2CB54AC-A30A-48BA-AF9C-9391B80D3137}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TVShowTracker.API", "backend\src\TVShowTracker.API\TVShowTracker.API.csproj", "{59FAE2AC-B8B6-4BBC-8EF1-0C080ED4312F}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TVShowTracker.Application", "backend\src\TVShowTracker.Application\TVShowTracker.Application.csproj", "{04E3A316-71C7-4CFC-BE06-06DF3EE454E0}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TVShowTracker.Domain", "backend\src\TVShowTracker.Domain\TVShowTracker.Domain.csproj", "{99373BDB-D9CD-41E1-BEEB-84AD031A9704}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TVShowTracker.Infrastructure", "backend\src\TVShowTracker.Infrastructure\TVShowTracker.Infrastructure.csproj", "{87B426DB-7125-4C8A-AC7E-4BAF9ECE1E6D}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -43,6 +63,22 @@ Global
 		{D06BF33F-90F4-40DB-A5AE-5F3F8E3E1E69}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{D06BF33F-90F4-40DB-A5AE-5F3F8E3E1E69}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{D06BF33F-90F4-40DB-A5AE-5F3F8E3E1E69}.Release|Any CPU.Build.0 = Release|Any CPU
+		{59FAE2AC-B8B6-4BBC-8EF1-0C080ED4312F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{59FAE2AC-B8B6-4BBC-8EF1-0C080ED4312F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{59FAE2AC-B8B6-4BBC-8EF1-0C080ED4312F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{59FAE2AC-B8B6-4BBC-8EF1-0C080ED4312F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{04E3A316-71C7-4CFC-BE06-06DF3EE454E0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{04E3A316-71C7-4CFC-BE06-06DF3EE454E0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{04E3A316-71C7-4CFC-BE06-06DF3EE454E0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{04E3A316-71C7-4CFC-BE06-06DF3EE454E0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{99373BDB-D9CD-41E1-BEEB-84AD031A9704}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{99373BDB-D9CD-41E1-BEEB-84AD031A9704}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{99373BDB-D9CD-41E1-BEEB-84AD031A9704}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{99373BDB-D9CD-41E1-BEEB-84AD031A9704}.Release|Any CPU.Build.0 = Release|Any CPU
+		{87B426DB-7125-4C8A-AC7E-4BAF9ECE1E6D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{87B426DB-7125-4C8A-AC7E-4BAF9ECE1E6D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{87B426DB-7125-4C8A-AC7E-4BAF9ECE1E6D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{87B426DB-7125-4C8A-AC7E-4BAF9ECE1E6D}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -53,6 +89,11 @@ Global
 		{21721D58-F101-4715-918F-9227F2472F0D} = {86D11942-435F-4A64-B761-AAAAD4554BCF}
 		{F246F184-4799-4280-990D-70FE0BEF9472} = {86D11942-435F-4A64-B761-AAAAD4554BCF}
 		{D06BF33F-90F4-40DB-A5AE-5F3F8E3E1E69} = {12F27C06-7B13-4FE9-88B8-44E03994F2B0}
+		{E2CB54AC-A30A-48BA-AF9C-9391B80D3137} = {1697C1EA-ADAE-4703-9C2B-896C3C0C236F}
+		{59FAE2AC-B8B6-4BBC-8EF1-0C080ED4312F} = {E2CB54AC-A30A-48BA-AF9C-9391B80D3137}
+		{04E3A316-71C7-4CFC-BE06-06DF3EE454E0} = {E2CB54AC-A30A-48BA-AF9C-9391B80D3137}
+		{99373BDB-D9CD-41E1-BEEB-84AD031A9704} = {E2CB54AC-A30A-48BA-AF9C-9391B80D3137}
+		{87B426DB-7125-4C8A-AC7E-4BAF9ECE1E6D} = {E2CB54AC-A30A-48BA-AF9C-9391B80D3137}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {F29A1A5F-4ED0-4156-92C1-8BA7AE402A16}
