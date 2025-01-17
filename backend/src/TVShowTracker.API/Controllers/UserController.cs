@@ -1,12 +1,10 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 
-namespace TVShowTracker.API.Controllers
+namespace TVShowTracker.API.Controllers;
+
+[Route("[controller]")]
+[ApiController]
+public class UserController : BaseController<User>
 {
-    public class UserController : Controller
-    {
-        public IActionResult Index()
-        {
-            return View();
-        }
-    }
+    
 }
